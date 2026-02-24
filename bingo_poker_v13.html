@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bingo para Poker - Sabadito Alegre</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 10px;
+      font-size: 13px;
+    }
+    
+    .container { max-width: 1400px; margin: 0 auto; }
+    
+    header {
+      text-align: center;
+      margin-bottom: 15px;
+      padding: 12px;
+      background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+      border-radius: 10px;
+      border: 3px solid #f39c12;
+    }
+    
+    header h1 { font-size: 1.5em; margin-bottom: 5px; color: #f39c12; }
+    .suites { font-size: 1.3em; letter-spacing: 5px; }
+    .red { color: #e74c3c; }
+    .black { color: #ecf0f1; }
+    
+    .login-section, .game-section {
+      background: rgba(255,255,255,0.1);
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .hidden { display: none; }
+    
+    input, button, select {
+      padding: 8px 12px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.9em;
+    }
+    
+    input {
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      width: 200px;
+    }
+    
+    button {
+      background: #3498db;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    button:hover { background: #2980b9; transform: translateY(-2px); }
+    button.cantador { background: #e74c3c; }
+    button.cantador:hover { background: #c0392b; }
+    button.premio { background: #f39c12; }
+    button.premio:hover { background: #d68910; }
+    button.verde { background: #27ae60; }
+    button.verde:hover { background: #219a52; }
+    
+    .status {
+      padding: 6px 10px;
+      border-radius: 5px;
+      margin: 8px 0;
+      font-size: 0.85em;
+    }
+    .status.connected { background: #27ae60; }
+    .status.disconnected { background: #e74c3c; }
+    
+    .layout-principal {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 15px;
+      margin: 15px 0;
+    }
+    
+    .columna {
+      background: rgba(255,255,255,0.08);
+      padding: 12px;
+      border-radius: 8px;
+      max-height: 650px;
+      overflow-y: auto;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    
+    .cartas-por-pintas { margin: 10px 0; }
+    
+    .pinta-grupo {
+      margin: 8px 0;
+      padding: 8px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 6px;
+    }
+    
+    .pinta-titulo {
+      font-weight: bold;
+      margin-bottom: 5px;
+      font-size: 0.85em;
+      color: #f39c12;
+    }
+    
+    .cartas-cantadas-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    
+    .carta-cantada {
+      width: 35px;
+      height: 50px;
+      background: #fff;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8em;
+      color: #000;
+      border: 2px solid #3498db;
+      animation: aparecer 0.3s ease;
+    }
+    
+    @keyframes aparecer { from { transform: scale(0); } to { transform: scale(1); } }
+    
+    .carton-bingo-pro {
+      background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+      border: 4px solid #3498db;
+      border-radius: 10px;
+      padding: 10px;
+      margin: 10px 0;
+      color: #000;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    
+    .carton-header-pro {
+      text-align: center;
+      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+      color: #fff;
+      padding: 8px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-weight: bold;
+      font-size: 1.1em;
+    }
+    
+    .carton-info-pro {
+      display: flex;
+      justify-content: space-around;
+      font-size: 0.8em;
+      margin-bottom: 6px;
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    
+    .carton-board-pro {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 3px;
+      background: #3498db;
+      padding: 3px;
+      border-radius: 6px;
+      border: 2px solid #2980b9;
+    }
+    
+    .carta-pro {
+      aspect-ratio: 3/4;
+      background: #fff;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7em;
+      cursor: pointer;
+      color: #000;
+      min-width: 25px;
+      padding: 3px 1px;
+      border: 1px solid #bdc3c7;
+      transition: all 0.2s;
+    }
+    
+    .carta-pro:hover { transform: scale(1.08); }
+    .carta-pro.tapada { 
+      background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); 
+      color: transparent;
+      border: 3px solid #f39c12;
+    }
+    .carta-pro.poker { border: 3px solid #f39c12; background: linear-gradient(135deg, #fef9e7 0%, #fcf3cf 100%); }
+    .carta-pro.full { border: 3px solid #9b59b6; background: linear-gradient(135deg, #f5eef8 0%, #ebdef0 100%); }
+    .carta-pro.especial { border: 3px solid #e74c3c; background: linear-gradient(135deg, #fdedec 0%, #fadbd8 100%); }
+    .carta-pro.centro { border: 3px solid #27ae60; background: linear-gradient(135deg, #e9f7ef 0%, #d5f5e3 100%); }
+    
+    .ultima-carta {
+      font-size: 1.8em;
+      text-align: center;
+      padding: 12px;
+      background: linear-gradient(135deg, #f39c12 0%, #d68910 100%);
+      border-radius: 8px;
+      margin: 10px 0;
+      animation: parpadeo 1s infinite;
+      color: #000;
+      font-weight: bold;
+    }
+    
+    @keyframes parpadeo { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    
+    .panel-cantador {
+      background: rgba(231, 76, 60, 0.25);
+      padding: 12px;
+      border-radius: 8px;
+      margin: 10px 0;
+      border: 2px solid #e74c3c;
+    }
+    
+    .pozos-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 10px 0;
+    }
+    
+    .pozo-item {
+      background: linear-gradient(135deg, rgba(241, 196, 15, 0.25) 0%, rgba(241, 196, 15, 0.15) 100%);
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      border: 2px solid #f39c12;
+      font-size: 0.8em;
+    }
+    
+    .pozo-item.ganado {
+      background: linear-gradient(135deg, rgba(39, 174, 96, 0.5) 0%, rgba(39, 174, 96, 0.4) 100%);
+      border-color: #27ae60;
+      animation: celebrar 0.5s ease;
+    }
+    
+    @keyframes celebrar { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+    
+    .pozo-nombre { font-weight: bold; margin-bottom: 4px; color: #f39c12; }
+    .pozo-premio { color: #27ae60; font-size: 0.95em; font-weight: bold; }
+    .pozo-cartas { font-size: 0.75em; opacity: 0.9; margin-top: 3px; }
+    
+    .alerta-ganador {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(135deg, #f39c12 0%, #d68910 100%);
+      color: #000;
+      padding: 35px;
+      border-radius: 15px;
+      z-index: 3000;
+      text-align: center;
+      box-shadow: 0 10px 50px rgba(0,0,0,0.6);
+      max-width: 90%;
+      border: 3px solid #fff;
+    }
+    
+    .alerta-ganador h2 {
+      font-size: 1.8em;
+      margin-bottom: 18px;
+      color: #c0392b;
+    }
+    
+    .estadisticas-panel {
+      background: rgba(52, 152, 219, 0.25);
+      padding: 12px;
+      border-radius: 8px;
+      margin: 10px 0;
+      font-size: 0.85em;
+      border: 1px solid rgba(52, 152, 219, 0.4);
+    }
+    
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+    }
+    
+    .grid-cartones {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+      margin: 10px 0;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .carton-item {
+      background: linear-gradient(135deg, rgba(52, 152, 219, 0.35) 0%, rgba(52, 152, 219, 0.25) 100%);
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      border: 2px solid transparent;
+      font-size: 0.85em;
+      transition: all 0.3s;
+    }
+    
+    .carton-item:hover { transform: translateY(-3px); background: rgba(52, 152, 219, 0.5); }
+    .carton-item.seleccionado { border-color: #27ae60; background: linear-gradient(135deg, rgba(39, 174, 96, 0.5) 0%, rgba(39, 174, 96, 0.4) 100%); }
+    .carton-item.bloqueado { border-color: #e74c3c; opacity: 0.65; cursor: not-allowed; background: rgba(231, 76, 60, 0.25); }
+    
+    .jugadores-lista {
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
+      border-radius: 8px;
+      margin: 10px 0;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    
+    .jugador-item {
+      padding: 5px;
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+      font-size: 0.85em;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .jugador-item.cantador { background: rgba(231, 76, 60, 0.35); font-weight: bold; border-radius: 5px; }
+    
+    .fase-indicator {
+      padding: 6px 14px;
+      border-radius: 15px;
+      display: inline-block;
+      margin: 8px 0;
+      font-weight: bold;
+      font-size: 0.9em;
+    }
+    
+    .fase-seleccion { background: linear-gradient(135deg, #27ae60 0%, #219a52 100%); }
+    .fase-jugando { background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); }
+    
+    .botones-pozos {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin: 8px 0;
+    }
+    
+    .boton-pozo {
+      padding: 5px 8px;
+      font-size: 0.75em;
+      background: linear-gradient(135deg, #f39c12 0%, #d68910 100%);
+      border-radius: 4px;
+    }
+    
+    .boton-pozo.reclamado {
+      background: linear-gradient(135deg, #27ae60 0%, #219a52 100%);
+      cursor: default;
+    }
+    
+    .monedas-display {
+      background: linear-gradient(135deg, rgba(241, 196, 15, 0.35) 0%, rgba(241, 196, 15, 0.25) 100%);
+      padding: 8px 14px;
+      border-radius: 8px;
+      display: inline-block;
+      margin: 8px 0;
+      font-weight: bold;
+      border: 2px solid #f39c12;
+      font-size: 0.95em;
+    }
+    
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.88);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .modal-content {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      padding: 25px;
+      border-radius: 12px;
+      max-width: 480px;
+      width: 90%;
+      border: 2px solid #3498db;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    
+    .modal.active { display: flex; }
+    
+    .notificacion {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      padding: 14px 20px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #27ae60 0%, #219a52 100%);
+      color: #fff;
+      z-index: 2000;
+      font-size: 0.9em;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+      animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    
+    .partida-info {
+      background: rgba(241, 196, 15, 0.25);
+      padding: 8px 14px;
+      border-radius: 8px;
+      display: inline-block;
+      margin: 8px 0;
+      border: 1px solid #f39c12;
+      font-weight: bold;
+    }
+    
+    .agregar-monedas-panel {
+      background: rgba(39, 174, 96, 0.25);
+      padding: 10px;
+      border-radius: 8px;
+      margin: 10px 0;
+      border: 1px solid #27ae60;
+    }
+    
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #3498db; border-radius: 4px; }
+    
+    @media (max-width: 1024px) { .layout-principal { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 768px) {
+      .layout-principal { grid-template-columns: 1fr; }
+      .pozos-container { grid-template-columns: repeat(2, 1fr); }
+      .carta-pro { font-size: 0.6em; min-width: 20px; }
+      input { width: 100%; margin: 4px 0; }
+      button { width: 100%; margin: 4px 0; }
+    }
+    
+    .text-center { text-align: center; }
+    .mb-8 { margin-bottom: 8px; }
+    .mt-8 { margin-top: 8px; }
+    .flex { display: flex; }
+    .flex-wrap { flex-wrap: wrap; }
+    .gap-5 { gap: 5px; }
+    .justify-between { justify-content: space-between; }
+    .align-center { align-items: center; }
+    .justify-center { justify-content: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>♠ ♥ ♦ ♣ BINGO PARA POKER ♣ ♦ ♥ ♠</h1>
+      <p class="suites">
+        <span class="black">♠</span>
+        <span class="red">♥</span>
+        <span class="red">♦</span>
+        <span class="black">♣</span>
+      </p>
+      <h2>SABADITO ALEGRE - 13 CARTONES - 6 POZOS</h2>
+    </header>
+
+    <div id="loginSection" class="login-section">
+      <h3>👤 Iniciar Sesión</h3>
+      <p style="margin: 10px 0; font-size: 0.9em;">Ingresa tu correo para unirte al juego</p>
+      
+      <div style="background: rgba(255,255,255,0.08); padding: 10px; border-radius: 6px; margin: 10px 0; font-size: 0.85em;">
+        <p>📧 Correos registrados:</p>
+        <p>humofra@yahoo.com.co | tatica2463@gmail.com | diana.molina7@gmail.com</p>
+        <p>caromolina87@gmail.com | jmolinam@celsia.com</p>
+      </div>
+      
+      <input type="email" id="emailInput" placeholder="Correo Electrónico">
+      <input type="text" id="nombreInput" placeholder="Tu Nombre">
+      <button onclick="iniciarSesion()">Entrar al Juego</button>
+      
+      <div id="estadoConexion" class="status disconnected">❌ Desconectado</div>
+    </div>
+
+    <div id="gameSection" class="game-section hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3>👤 <span id="jugadorNombre">-</span></h3>
+          <div class="monedas-display">💰 Monedas: <span id="misMonedas">40</span></div>
+          <span id="faseJuego" class="fase-indicator fase-seleccion">Fase: Selección</span>
+          <div class="partida-info">Partida: <span id="partidaActual">1</span>/6</div>
+        </div>
+        <button onclick="cerrarSesion()">Salir</button>
+      </div>
+
+      <div id="panelCantador" class="panel-cantador hidden">
+        <h3>🎤 Panel del Cantador</h3>
+        <div class="flex flex-wrap gap-5">
+          <button class="cantador" onclick="cantarCartaAleatoria()">🃏 Cantar Carta</button>
+          <button class="cantador" onclick="iniciarJuego()">▶️ Iniciar Juego</button>
+          <button class="cantador" onclick="toggleFaseSeleccion()">🔄 Selección</button>
+          <button class="cantador" onclick="siguientePartida()">➡️ Siguiente</button>
+          <button class="cantador" onclick="reiniciarJuego()">🔄 Reiniciar</button>
+        </div>
+        
+        <div class="agregar-monedas-panel mt-8">
+          <h4>💵 Agregar Monedas a Jugador</h4>
+          <select id="selectJugadorMonedas" style="width: 160px;"></select>
+          <input type="number" id="cantidadMonedas" placeholder="Cantidad" style="width: 90px;" min="1" max="100">
+          <button class="verde" onclick="agregarMonedas()">Agregar</button>
+        </div>
+      </div>
+
+      <div id="alertaGanador" class="alerta-ganador hidden">
+        <h2>🏆 ¡GANADOR!</h2>
+        <p id="mensajeGanador" style="font-size: 1.15em; margin: 18px 0;"></p>
+        <div class="flex gap-5 justify-center">
+          <button class="verde" onclick="confirmarPremio()">✅ Confirmar Premio</button>
+          <button class="cantador" onclick="rechazarPremio()">❌ Rechazar</button>
+        </div>
+      </div>
+
+      <div id="ultimaCartaContainer" class="ultima-carta hidden">
+        <h4 style="margin-bottom: 8px;">Última Carta Cantada</h4>
+        <div id="ultimaCartaDisplay"></div>
+      </div>
+
+      <div class="layout-principal">
+        <div class="columna">
+          <h3>🃏 Cartas Cantadas (<span id="contadorCartas">0</span>)</h3>
+          <div id="cartasPorPintas" class="cartas-por-pintas"></div>
+          
+          <h3 class="mt-8">🏆 Los 6 Pozos</h3>
+          <div class="pozos-container">
+            <div class="pozo-item" id="pozo-pokino"><div class="pozo-nombre">POKINO</div><div class="pozo-premio">$50</div><div class="pozo-cartas">5 cartas</div></div>
+            <div class="pozo-item" id="pozo-cuatroEsquinas"><div class="pozo-nombre">4 ESQUINAS</div><div class="pozo-premio">$150</div><div class="pozo-cartas">4 cartas</div></div>
+            <div class="pozo-item" id="pozo-full"><div class="pozo-nombre">FULL</div><div class="pozo-premio">$200</div><div class="pozo-cartas">5 cartas</div></div>
+            <div class="pozo-item" id="pozo-poker"><div class="pozo-nombre">POKER</div><div class="pozo-premio">$300</div><div class="pozo-cartas">4 cartas</div></div>
+            <div class="pozo-item" id="pozo-centro"><div class="pozo-nombre">CENTRO</div><div class="pozo-premio">$250</div><div class="pozo-cartas">1 carta</div></div>
+            <div class="pozo-item" id="pozo-especial"><div class="pozo-nombre">ESPECIAL</div><div class="pozo-premio">$500</div><div class="pozo-cartas">5 cartas</div></div>
+          </div>
+        </div>
+
+        <div class="columna">
+          <h3>🎯 Mis Cartones</h3>
+          <div id="misCartones"></div>
+        </div>
+
+        <div class="columna">
+          <h3>👥 Jugadores (<span id="contadorJugadores">0</span>)</h3>
+          <div id="listaJugadores" class="jugadores-lista"></div>
+          
+          <div class="estadisticas-panel">
+            <h4>📊 Tus Estadísticas</h4>
+            <div id="estadisticas"></div>
+          </div>
+          
+          <h3 class="mt-8">⚙️ Opciones</h3>
+          <button onclick="mostrarModalSolicitud()">📝 Solicitar Cambio</button>
+          <button id="btnSerCantador" onclick="establecerseCantador()">🎤 Ser Cantador</button>
+        </div>
+      </div>
+
+      <div id="seleccionCartones">
+        <h3>🎯 Selecciona tus Cartones (Máx 3)</h3>
+        <p style="font-size: 0.85em; margin: 8px 0;">13 cartones disponibles (A-K) | 6 monedas por cartón</p>
+        <div id="gridCartones" class="grid-cartones"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalSolicitud" class="modal">
+    <div class="modal-content">
+      <h3>📝 Solicitar Cambio de Cartón</h3>
+      <textarea id="mensajeSolicitud" placeholder="Motivo del cambio..." style="width: 100%; padding: 10px; margin: 10px 0; background: rgba(255,255,255,0.1); color: #fff; border: none; border-radius: 5px; min-height: 90px;"></textarea>
+      <div class="flex gap-5">
+        <button onclick="enviarSolicitud()">Enviar</button>
+        <button onclick="cerrarModalSolicitud()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let socket;
+    let emailActual = '';
+    let nombreActual = '';
+    let gameState = {};
+    let premioPendiente = null;
+    const colores = {'♠': 'black', '♣': 'black', '♥': 'red', '♦': 'red'};
+    
+    const pozosInfo = {
+      pokino: { nombre: 'POKINO', premio: 50 },
+      cuatroEsquinas: { nombre: '4 ESQUINAS', premio: 150 },
+      full: { nombre: 'FULL', premio: 200 },
+      poker: { nombre: 'POKER', premio: 300 },
+      centro: { nombre: 'CENTRO', premio: 250 },
+      especial: { nombre: 'ESPECIAL', premio: 500 }
+    };
+
+    function conectarSocket() {
+      socket = io();
+      
+      socket.on('connect', () => {
+        document.getElementById('estadoConexion').className = 'status connected';
+        document.getElementById('estadoConexion').innerHTML = '✅ Conectado';
+      });
+      
+      socket.on('disconnect', () => {
+        document.getElementById('estadoConexion').className = 'status disconnected';
+        document.getElementById('estadoConexion').innerHTML = '❌ Desconectado';
+      });
+      
+      socket.on('gameState', (state) => {
+        console.log('📊 Recibiendo gameState:', state);
+        gameState = state;
+        renderizarTodo();
+        if (state.partidaActual) {
+          document.getElementById('partidaActual').textContent = state.partidaActual;
+        }
+      });
+      
+      socket.on('updateJugadores', (jugadores) => {
+        console.log('👥 Actualizando jugadores:', jugadores);
+        gameState.jugadores = jugadores;
+        renderizarJugadores();
+        actualizarSelectJugadores();
+        if (jugadores[emailActual]) {
+          document.getElementById('misMonedas').textContent = jugadores[emailActual].monedas;
+        }
+      });
+      
+      socket.on('updateCartones', (cartones) => {
+        console.log('🎴 Actualizando cartones:', cartones);
+        gameState.cartones = cartones;
+        renderizarGridCartones();
+        renderizarMisCartones();
+      });
+      
+      socket.on('updateCartasCantadas', (cartas) => {
+        gameState.cartasCantadas = cartas;
+        renderizarCartasPorPintas();
+        document.getElementById('contadorCartas').textContent = cartas.length;
+      });
+      
+      socket.on('updateUltimaCarta', (carta) => {
+        const container = document.getElementById('ultimaCartaContainer');
+        const display = document.getElementById('ultimaCartaDisplay');
+        if (carta) {
+          container.classList.remove('hidden');
+          display.innerHTML = `<span style="color: ${colores[carta.palo]}">${carta.valor} ${carta.palo}</span>`;
+        } else {
+          container.classList.add('hidden');
+        }
+      });
+      
+      socket.on('updateFaseJuego', (fase) => {
+        gameState.faseJuego = fase;
+        const indicator = document.getElementById('faseJuego');
+        const seleccion = document.getElementById('seleccionCartones');
+        if (fase === 'seleccion') {
+          indicator.className = 'fase-indicator fase-seleccion';
+          indicator.textContent = 'Fase: Selección';
+          seleccion.classList.remove('hidden');
+        } else {
+          indicator.className = 'fase-indicator fase-jugando';
+          indicator.textContent = 'Fase: Jugando';
+          seleccion.classList.add('hidden');
+        }
+      });
+      
+      socket.on('updateCantador', (email) => {
+        gameState.cantador = email;
+        document.getElementById('panelCantador').classList.toggle('hidden', email !== emailActual);
+        document.getElementById('btnSerCantador').style.display = email ? 'none' : 'inline-block';
+        renderizarJugadores();
+      });
+      
+      socket.on('updateEstadisticas', (estadisticas) => {
+        gameState.estadisticas = estadisticas;
+        renderizarEstadisticas();
+      });
+      
+      socket.on('alertaGanador', (data) => {
+        if (gameState.cantador === emailActual) {
+          premioPendiente = data;
+          document.getElementById('mensajeGanador').textContent = data.mensaje;
+          document.getElementById('alertaGanador').classList.remove('hidden');
+          mostrarNotificacion(data.mensaje, 'success');
+        } else {
+          mostrarNotificacion(data.mensaje, 'success');
+        }
+      });
+      
+      socket.on('premioConfirmado', (data) => {
+        mostrarNotificacion(`✅ ${data.jugador} ganó ${data.pozo} ($${data.premio})`, 'success');
+        document.getElementById('alertaGanador').classList.add('hidden');
+        premioPendiente = null;
+      });
+      
+      socket.on('premioRechazado', (data) => {
+        mostrarNotificacion(data.mensaje, 'error');
+        document.getElementById('alertaGanador').classList.add('hidden');
+        premioPendiente = null;
+      });
+      
+      socket.on('monedasAgregadas', (data) => {
+        mostrarNotificacion(`💰 ${data.cantidad} monedas agregadas a ${data.jugador}`, 'success');
+      });
+      
+      socket.on('error', (mensaje) => {
+        mostrarNotificacion('❌ ' + mensaje, 'error');
+      });
+      
+      socket.on('reconexionExitosa', (data) => {
+        mostrarNotificacion('✅ ' + data.mensaje, 'success');
+      });
+      
+      socket.on('juegoIniciado', (data) => {
+        mostrarNotificacion(data.mensaje, 'success');
+      });
+      
+      socket.on('siguientePartida', (data) => {
+        mostrarNotificacion(`➡️ Partida ${data.partida} iniciada`, 'success');
+        document.getElementById('partidaActual').textContent = data.partida;
+      });
+    }
+
+    function iniciarSesion() {
+      const email = document.getElementById('emailInput').value.trim();
+      const nombre = document.getElementById('nombreInput').value.trim();
+      if (!email || !nombre) { 
+        mostrarNotificacion('Ingresa correo y nombre', 'error');
+        return; 
+      }
+      emailActual = email;
+      nombreActual = nombre;
+      socket.emit('registerPlayer', email, nombre);
+      document.getElementById('loginSection').classList.add('hidden');
+      document.getElementById('gameSection').classList.remove('hidden');
+      document.getElementById('jugadorNombre').textContent = nombre;
+      console.log('👤 Sesión iniciada:', emailActual);
+    }
+
+    function cerrarSesion() {
+      location.reload();
+    }
+
+    function renderizarTodo() {
+      console.log('🔄 Renderizando todo...');
+      renderizarJugadores();
+      renderizarGridCartones();
+      renderizarMisCartones();
+      renderizarCartasPorPintas();
+      renderizarEstadisticas();
+    }
+
+    function renderizarJugadores() {
+      const lista = document.getElementById('listaJugadores');
+      const jugadores = gameState.jugadores || {};
+      lista.innerHTML = Object.entries(jugadores).map(([email, datos]) => `
+        <div class="jugador-item ${gameState.cantador === email ? 'cantador' : ''}">
+          <span>${datos.nombre} ${gameState.cantador === email ? '🎤' : ''}</span>
+          <span style="color: #f39c12;">${datos.monedas || 0} 💰</span>
+        </div>
+      `).join('');
+      document.getElementById('contadorJugadores').textContent = Object.keys(jugadores).length;
+    }
+
+    function actualizarSelectJugadores() {
+      const select = document.getElementById('selectJugadorMonedas');
+      const jugadores = gameState.jugadores || {};
+      select.innerHTML = Object.entries(jugadores).map(([email, datos]) => 
+        `<option value="${email}">${datos.nombre} (${datos.monedas || 0} 💰)</option>`
+      ).join('');
+    }
+
+    function agregarMonedas() {
+      const emailJugador = document.getElementById('selectJugadorMonedas').value;
+      const cantidad = parseInt(document.getElementById('cantidadMonedas').value);
+      
+      if (!cantidad || cantidad < 1 || cantidad > 100) {
+        mostrarNotificacion('Ingresa cantidad válida (1-100)', 'error');
+        return;
+      }
+      
+      socket.emit('agregarMonedas', emailJugador, cantidad, emailActual);
+      document.getElementById('cantidadMonedas').value = '';
+    }
+
+    function renderizarGridCartones() {
+      const grid = document.getElementById('gridCartones');
+      const cartones = gameState.cartones || [];
+      
+      if (!cartones || cartones.length === 0) {
+        grid.innerHTML = '<p>Cargando cartones...</p>';
+        return;
+      }
+      
+      grid.innerHTML = cartones.map(carton => {
+        const seleccionado = carton.dueño === emailActual;
+        const bloqueado = carton.dueño && carton.dueño !== emailActual;
+        return `
+          <div class="carton-item ${seleccionado ? 'seleccionado' : ''} ${bloqueado ? 'bloqueado' : ''}" 
+               onclick="${!bloqueado ? `seleccionarCarton(${carton.numero})` : ''}">
+            <strong style="color: #f39c12;">${carton.nombre}</strong>
+            <p style="font-size: 0.8em; margin: 5px 0;">${seleccionado ? '✅ Tuyo' : bloqueado ? '🔒 Ocupado' : '📋 Libre'}</p>
+            <p style="font-size: 0.75em;">★ Poker: ${carton.valorPoker}</p>
+            <p style="font-size: 0.75em;">★ Full: ${carton.valorFull2} + ${carton.valorFull3}</p>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function seleccionarCarton(numero) {
+      console.log('🎴 Seleccionando cartón:', numero);
+      const carton = gameState.cartones.find(c => c.numero === numero);
+      if (carton && carton.dueño === emailActual) {
+        socket.emit('liberarCarton', numero, emailActual);
+      } else {
+        socket.emit('seleccionarCarton', numero, emailActual, nombreActual);
+      }
+    }
+
+    function renderizarMisCartones() {
+      const container = document.getElementById('misCartones');
+      const cartones = gameState.cartones || [];
+      
+      if (!cartones || cartones.length === 0) {
+        container.innerHTML = '<p style="text-align: center; padding: 30px; color: #95a5a6;">Cargando cartones...</p>';
+        return;
+      }
+      
+      const misCartones = cartones.filter(c => c.dueño === emailActual);
+      
+      console.log('🎯 Mis cartones:', misCartones);
+      console.log('Email actual:', emailActual);
+      
+      if (!misCartones || misCartones.length === 0) {
+        container.innerHTML = '<p style="text-align: center; padding: 30px; color: #95a5a6; font-size: 0.9em;">Selecciona cartones arriba para jugar</p>';
+        return;
+      }
+      
+      container.innerHTML = misCartones.map(carton => {
+        // VALIDACIÓN CRÍTICA: Verificar que carton.cartas exista y sea válido
+        if (!carton.cartas || !Array.isArray(carton.cartas) || carton.cartas.length !== 25) {
+          console.error('❌ Cartón inválido:', carton);
+          return `<div class="carton-bingo-pro"><p style="color: #e74c3c; text-align: center;">Error en cartón ${carton.numero}</p></div>`;
+        }
+        
+        return `
+        <div class="carton-bingo-pro">
+          <div class="carton-header-pro">${carton.nombre}</div>
+          <div class="carton-info-pro">
+            <span>★ Poker: ${carton.valorPoker}</span>
+            <span>★ Full: ${carton.valorFull2}+${carton.valorFull3}</span>
+          </div>
+          <div class="carton-board-pro">
+            ${carton.cartas.map((carta, index) => {
+              if (!carta) {
+                console.error('❌ Carta indefinida en índice:', index);
+                return `<div class="carta-pro">?</div>`;
+              }
+              return `
+              <div class="carta-pro ${carta.tipo || ''} ${carton.tapadas && carton.tapadas[index] ? 'tapada' : ''}" 
+                   onclick="taparCarta(${carton.numero}, ${index})">
+                <div style="color: ${colores[carta.palo]}; font-weight: bold; font-size: 1.1em;">${carta.valor}</div>
+                <div style="color: ${colores[carta.palo]}; font-size: 1.3em;">${carta.palo}</div>
+              </div>
+            `}).join('')}
+          </div>
+          <div class="botones-pozos">
+            ${Object.keys(pozosInfo).map(pozo => `
+              <button class="boton-pozo ${carton.pozos && carton.pozos[pozo] ? 'reclamado' : ''}" 
+                      onclick="reclamarPremio(${carton.numero}, '${pozo}')" 
+                      ${(carton.pozos && carton.pozos[pozo]) ? 'disabled' : ''}>${pozosInfo[pozo].nombre}</button>
+            `).join('')}
+          </div>
+        </div>
+      `}).join('');
+    }
+
+    function taparCarta(numeroCarton, index) {
+      socket.emit('taparCarta', numeroCarton, index, emailActual);
+    }
+
+    function reclamarPremio(numeroCarton, pozo) {
+      socket.emit('reclamarPremio', numeroCarton, pozo, emailActual);
+    }
+
+    function renderizarCartasPorPintas() {
+      const container = document.getElementById('cartasPorPintas');
+      const cartas = gameState.cartasCantadas || [];
+      
+      const porPintas = { '♠': [], '♥': [], '♦': [], '♣': [] };
+      
+      cartas.forEach(carta => {
+        if (carta && carta.palo) {
+          porPintas[carta.palo].push(carta);
+        }
+      });
+      
+      container.innerHTML = Object.entries(porPintas).map(([palo, cartasPalo]) => `
+        <div class="pinta-grupo">
+          <div class="pinta-titulo" style="color: ${colores[palo]}">${palo} (${cartasPalo.length})</div>
+          <div class="cartas-cantadas-grid">
+            ${cartasPalo.map(carta => `
+              <div class="carta-cantada" style="color: ${colores[carta.palo]}">
+                <div style="font-weight: bold;">${carta.valor}</div>
+                <div style="font-size: 1.3em;">${carta.palo}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderizarEstadisticas() {
+      const container = document.getElementById('estadisticas');
+      const stats = gameState.estadisticas ? gameState.estadisticas[emailActual] : null;
+      
+      if (!stats) {
+        container.innerHTML = '<p>Sin datos</p>';
+        return;
+      }
+      
+      container.innerHTML = `
+        <div class="stats-row"><span>💰 Monedas:</span><span style="color: #f39c12; font-weight: bold;">${stats.monedas}</span></div>
+        <div class="stats-row"><span>🏆 Ganadas:</span><span style="color: #27ae60;">${stats.ganadas}</span></div>
+        <div class="stats-row"><span>📉 Perdidas:</span><span style="color: #e74c3c;">${stats.perdidas}</span></div>
+        <div class="stats-row"><span>🎯 Pozos:</span><span>${stats.pozosGanados ? stats.pozosGanados.length : 0}</span></div>
+      `;
+    }
+
+    function establecerseCantador() {
+      socket.emit('establecerCantador', emailActual);
+    }
+
+    function cantarCartaAleatoria() {
+      socket.emit('cantarCartaAleatoria', emailActual);
+    }
+
+    function iniciarJuego() {
+      socket.emit('iniciarJuego', emailActual);
+    }
+
+    function toggleFaseSeleccion() {
+      socket.emit('toggleFaseSeleccion', emailActual);
+    }
+
+    function siguientePartida() {
+      socket.emit('siguientePartida', emailActual);
+    }
+
+    function reiniciarJuego() {
+      if (confirm('¿Reiniciar todo el juego?')) {
+        socket.emit('reiniciarJuego', emailActual);
+      }
+    }
+
+    function confirmarPremio() {
+      if (premioPendiente) {
+        const pozoKey = Object.keys(pozosInfo).find(k => pozosInfo[k].nombre === premioPendiente.pozo);
+        socket.emit('confirmarPremio', premioPendiente.carton, pozoKey, premioPendiente.email, emailActual);
+      }
+    }
+
+    function rechazarPremio() {
+      document.getElementById('alertaGanador').classList.add('hidden');
+      premioPendiente = null;
+      mostrarNotificacion('❌ Premio rechazado', 'error');
+    }
+
+    function mostrarModalSolicitud() {
+      document.getElementById('modalSolicitud').classList.add('active');
+    }
+
+    function cerrarModalSolicitud() {
+      document.getElementById('modalSolicitud').classList.remove('active');
+      document.getElementById('mensajeSolicitud').value = '';
+    }
+
+    function enviarSolicitud() {
+      const mensaje = document.getElementById('mensajeSolicitud').value.trim();
+      if (!mensaje) { 
+        mostrarNotificacion('Escribe un motivo', 'error');
+        return; 
+      }
+      socket.emit('solicitarCambio', emailActual, mensaje);
+      cerrarModalSolicitud();
+      mostrarNotificacion('✅ Solicitud enviada', 'success');
+    }
+
+    function mostrarNotificacion(mensaje, tipo = 'success') {
+      const notif = document.createElement('div');
+      notif.className = 'notificacion';
+      notif.style.background = tipo === 'error' ? 
+        'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)' : 
+        'linear-gradient(135deg, #27ae60 0%, #219a52 100%)';
+      notif.textContent = mensaje;
+      document.body.appendChild(notif);
+      setTimeout(() => notif.remove(), 4000);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      conectarSocket();
+      window.onclick = (event) => {
+        if (event.target.id === 'modalSolicitud') cerrarModalSolicitud();
+      };
+    });
+  </script>
+</body>
+</html>
